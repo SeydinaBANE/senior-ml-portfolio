@@ -1,0 +1,12 @@
+apiVersion: v2
+name: intel-agent
+description: AI-powered document summarizer and competitive intelligence agent
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - ai
+  - llm
+  - intelligence
+maintainers:
+  - name: maintainer

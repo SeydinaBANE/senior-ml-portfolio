@@ -1,0 +1,52 @@
+name: CD
+
+on:
+  workflow_run:
+    workflows: [CI]
+    branches: [main]
+    types: [completed]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.0
+
+      - name: Configure kubectl
+        uses: azure/k8s-set-context@v4
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBECONFIG }}
+
+      - name: Helm upgrade
+        run: |
+          helm upgrade --install intel-agent ./helm/intel-agent \
+            --namespace intel-agent \
+            --create-namespace \
+            --values ./helm/intel-agent/values.yaml \
+            --values ./helm/intel-agent/values.prod.yaml \
+            --set image.tag=${{ github.sha }} \
+            --set secrets.OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
+            --set secrets.LANGFUSE_PUBLIC_KEY="${{ secrets.LANGFUSE_PUBLIC_KEY }}" \
+            --set secrets.LANGFUSE_SECRET_KEY="${{ secrets.LANGFUSE_SECRET_KEY }}" \
+            --wait \
+            --timeout 5m
+
+      - name: Verify rollout
+        run: |
+          kubectl rollout status deployment/intel-agent-intel-agent \
+            --namespace intel-agent \
+            --timeout=120s
+
+      - name: Smoke test
+        run: |
+          POD=$(kubectl get pod -n intel-agent -l app.kubernetes.io/name=intel-agent -o jsonpath='{.items[0].metadata.name}')
+          kubectl exec -n intel-agent $POD -- python -c \
+            "import httpx; r = httpx.get('http://localhost:8000/health'); r.raise_for_status(); print(r.json())"

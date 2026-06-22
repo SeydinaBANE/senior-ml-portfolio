@@ -17,7 +17,9 @@ def _mock_llm(content: str, tokens: int) -> MagicMock:
 
 @pytest.mark.asyncio
 async def test_summarize_returns_response() -> None:
-    with patch("app.agent.summarizer._llm", new=_mock_llm("Key points:\n- A\n- B\nConclusion: Good.", 250)):
+    with patch(
+        "app.agent.summarizer._llm", new=_mock_llm("Key points:\n- A\n- B\nConclusion: Good.", 250)
+    ):
         result = await summarize_document(SummaryRequest(content="x" * 100, language="en"))
 
     assert isinstance(result, SummaryResponse)

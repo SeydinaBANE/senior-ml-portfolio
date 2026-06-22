@@ -8,9 +8,15 @@ from app.schemas.summarize import SummaryResponse
 
 @pytest.mark.asyncio
 async def test_summarize_endpoint(client: AsyncClient) -> None:
-    mock_response = SummaryResponse(summary="A nice summary.", tokens_used=80, latency_ms=200, model="gpt-4o")
+    mock_response = SummaryResponse(
+        summary="A nice summary.", tokens_used=80, latency_ms=200, model="gpt-4o"
+    )
 
-    with patch("app.api.routes.summarize.summarize_document", new_callable=AsyncMock, return_value=mock_response):
+    with patch(
+        "app.api.routes.summarize.summarize_document",
+        new_callable=AsyncMock,
+        return_value=mock_response,
+    ):
         response = await client.post(
             "/api/v1/summarize",
             json={"content": "x" * 100, "language": "en"},
