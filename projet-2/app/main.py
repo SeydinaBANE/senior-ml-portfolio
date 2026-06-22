@@ -1,0 +1,25 @@
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
+
+from fastapi import FastAPI
+from prometheus_client import start_http_server
+
+from app.api.routes import agents, admin, health
+from app.config import settings
+from app.db.session import engine
+from app.observability.tracing import setup_tracing
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    setup_tracing()
+    start_http_server(settings.metrics_port)
+    yield
+    await engine.dispose()
+
+
+app = FastAPI(title="Secure Agent Platform", version="0.1.0", lifespan=lifespan)
+
+app.include_router(health.router, tags=["health"])
+app.include_router(agents.router, prefix=settings.api_v1_prefix, tags=["agents"])
+app.include_router(admin.router, prefix=settings.api_v1_prefix, tags=["admin"])
