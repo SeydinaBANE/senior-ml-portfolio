@@ -22,5 +22,8 @@ class Settings(BaseSettings):
     price_per_1k_input_tokens: float = 0.005
     price_per_1k_output_tokens: float = 0.015
 
+    otlp_endpoint: str = "http://localhost:4317"
+    metrics_port: int = 9090
+
 
 settings = Settings()  # type: ignore[call-arg]

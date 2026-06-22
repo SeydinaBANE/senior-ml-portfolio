@@ -2,14 +2,19 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from prometheus_client import start_http_server
 
 from app.api.routes import agents, auth, billing, health, run
 from app.config import settings
 from app.db.session import engine
+from app.observability.tracing import setup_tracing
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    setup_tracing()
+    if settings.app_env != "test":
+        start_http_server(settings.metrics_port)
     yield
     await engine.dispose()
 
