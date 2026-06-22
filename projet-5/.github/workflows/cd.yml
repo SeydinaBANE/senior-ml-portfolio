@@ -1,0 +1,28 @@
+name: CD
+
+on:
+  workflow_run:
+    workflows: [CI]
+    branches: [main]
+    types: [completed]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Configure kubeconfig
+        run: echo "${{ secrets.KUBECONFIG }}" | base64 -d > /tmp/kubeconfig
+
+      - name: Deploy to Kubernetes
+        run: |
+          kubectl --kubeconfig=/tmp/kubeconfig set image deployment/agent-platform-api \
+            api=ghcr.io/${{ github.repository }}:${{ github.sha }}
+          kubectl --kubeconfig=/tmp/kubeconfig rollout status deployment/agent-platform-api --timeout=120s
+        env:
+          KUBECONFIG: /tmp/kubeconfig
