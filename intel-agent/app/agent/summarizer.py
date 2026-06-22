@@ -1,4 +1,5 @@
 import time
+from typing import cast
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
@@ -38,8 +39,8 @@ async def summarize_document(request: SummaryRequest) -> SummaryResponse:
         )
         latency = time.monotonic() - start
 
-        usage = response.usage_metadata if isinstance(response, AIMessage) else None
-        tokens = usage.get("total_tokens", 0) if usage else 0
+        ai_msg = cast(AIMessage, response)
+        tokens = ai_msg.usage_metadata.get("total_tokens", 0) if ai_msg.usage_metadata else 0
         summarization_latency.labels(model=settings.openai_model).observe(latency)
         tokens_consumed_total.labels(operation="summarize", model=settings.openai_model).inc(tokens)
 

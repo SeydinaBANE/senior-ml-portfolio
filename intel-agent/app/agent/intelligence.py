@@ -1,3 +1,5 @@
+from typing import cast
+
 from langchain_community.tools import DuckDuckGoSearchRun
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
@@ -45,8 +47,8 @@ async def gather_intelligence(request: IntelRequest) -> IntelResponse:
             ]
         )
 
-        usage = response.usage_metadata if isinstance(response, AIMessage) else None
-        tokens = usage.get("total_tokens", 0) if usage else 0
+        ai_msg = cast(AIMessage, response)
+        tokens = ai_msg.usage_metadata.get("total_tokens", 0) if ai_msg.usage_metadata else 0
         tokens_consumed_total.labels(operation="intelligence", model=settings.openai_model).inc(
             tokens
         )
