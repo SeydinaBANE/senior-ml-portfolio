@@ -25,6 +25,16 @@ class AgentResponse(BaseModel):
     owner_id: UUID
 
 
+class AgentUpdateRequest(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    system_prompt: str | None = None
+    tools: list[str] | None = None
+    model: str | None = None
+    tags: list[str] | None = None
+    is_public: bool | None = None
+
+
 class RunRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=4000)
 
