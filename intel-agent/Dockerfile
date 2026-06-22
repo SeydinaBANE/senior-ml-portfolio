@@ -3,7 +3,7 @@ FROM python:3.12-slim AS builder
 WORKDIR /app
 RUN pip install hatchling
 COPY pyproject.toml .
-RUN pip install --no-cache-dir -e ".[dev]"
+RUN pip install --no-cache-dir .
 
 FROM python:3.12-slim AS runtime
 
