@@ -18,7 +18,11 @@ def get_current_user(
             settings.secret_key,
             algorithms=[settings.jwt_algorithm],
         )
-        return {"user_id": payload["sub"], "tenant_id": payload["tenant_id"]}
+        return {
+            "user_id": payload["sub"],
+            "tenant_id": payload["tenant_id"],
+            "is_admin": str(payload.get("is_admin", False)),
+        }
     except (JWTError, KeyError):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -32,3 +36,11 @@ def get_tenant_id(user: dict[str, str] = Depends(get_current_user)) -> UUID:
 
 def get_user_id(user: dict[str, str] = Depends(get_current_user)) -> str:
     return user["user_id"]
+
+
+def require_admin(user: dict[str, str] = Depends(get_current_user)) -> None:
+    if user.get("is_admin") != "True":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
