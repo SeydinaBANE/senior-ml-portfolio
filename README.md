@@ -280,4 +280,4 @@ docker compose up --build   # full local stack
 ## Contact
 
 **Seydina BANE** — Senior Agentic AI Engineer  
-[seriegalsen9@gmail.com](mailto:seriegalsen9@gmail.com) · [GitHub](https://github.com/SeydinaBANE)
+[baneseydinamouhamet@gmail.com](mailto:baneseydinamouhamet@gmail.com) · [GitHub](https://github.com/SeydinaBANE)
