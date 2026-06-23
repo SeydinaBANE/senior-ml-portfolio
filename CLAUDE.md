@@ -40,26 +40,29 @@ All projects use Python 3.12, `hatchling`, `ruff`, `mypy` (strict), and `pytest-
 pip install -e ".[dev]"                        # install with dev extras
 ruff format app/ tests/                        # format (run before lint)
 ruff check app/ tests/                         # lint (line-length=100, ruleset: E,F,I,UP,N,S,B,A; S101 ignored)
-mypy app/                                      # type check (strict=true)
+mypy app/                                      # type check (strict=true, ignore_missing_imports=true)
 APP_ENV=test pytest                            # all tests with coverage
 APP_ENV=test pytest tests/path/test_file.py    # single test file
 APP_ENV=test pytest -k "test_name" -v          # single test by name
 docker compose up --build                      # local full stack
 ```
 
-`enterprise-agent` and `enterprise-rag` use Alembic for DB migrations:
+`enterprise-agent`, `secure-agent-platform`, and `agent-platform` use Alembic for DB migrations (run inside the project dir):
 ```bash
 alembic upgrade head
 alembic revision --autogenerate -m "description"
 ```
+Layout differs per project: `enterprise-agent` keeps migrations at `app/db/migrations/` with `alembic.ini` at the root; `secure-agent-platform` and `agent-platform` use an `alembic/` directory. `enterprise-rag` has the Alembic dependency but **no** migration setup.
 
-`enterprise-rag` has a Streamlit evaluation UI: `streamlit run ui/streamlit_app.py`
+`enterprise-rag`, `agent-platform`, and `research-agent` each ship a Streamlit UI: `streamlit run ui/streamlit_app.py` (or `docker compose up ui`).
 
-`APP_ENV=test` is required — the app conditionally skips DB/Redis init in test mode. Tests use `httpx.AsyncClient(transport=ASGITransport(app=app))` — no live server needed. The `auth_headers` fixture in `conftest.py` mints a JWT and must be passed to all authenticated endpoints.
+Per-project lint nuances on top of the shared ruleset: `agent-platform` also ignores S105, S106, B008; `intel-agent` ignores E402 in `tests/conftest.py`. The root briefs `offre.md`, `CONSEIL.md`, and `projet-*.md` are gitignored — present on disk but excluded from commits.
+
+`APP_ENV=test` is required — the app conditionally skips DB/Redis init in test mode. Tests use `httpx.AsyncClient(transport=ASGITransport(app=app))` — no live server needed. Auth fixtures vary by project, so read each `conftest.py`: `enterprise-agent` and `secure-agent-platform` export `auth_headers` (mints a JWT); `agent-platform` exports role-scoped `admin_headers` / `dev_headers` / `user_headers`; `intel-agent`, `enterprise-rag`, and `research-agent` define no auth fixture.
 
 Docker Compose services: `pgvector/pgvector:pg16` (postgres with vector extension), `redis:7-alpine`, and `langfuse/langfuse:latest` on port 3000. Copy `.env.example` → `.env` before `docker compose up`.
 
-CI (`intel-agent` has the reference workflow at `.github/workflows/ci.yml`) runs lint → typecheck → test → build/push to GHCR on `main`. CD (`.github/workflows/cd.yml`) applies `helm upgrade` after the image push.
+CI (`intel-agent` has the reference workflow at `.github/workflows/ci.yml`) runs lint → typecheck → test → build/push to GHCR on `main`. CD (`.github/workflows/cd.yml`) applies `helm upgrade` after the image push. Workflow coverage varies: `intel-agent` and `agent-platform` have both `ci.yml` + `cd.yml`; `enterprise-agent` and `secure-agent-platform` have `ci.yml` only; `enterprise-rag` and `research-agent` have no `.github/` workflows yet.
 
 ## Architecture patterns shared across projects
 
