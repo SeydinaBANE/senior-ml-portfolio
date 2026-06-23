@@ -1,0 +1,14 @@
+{
+  "name": "__PKG__-widget",
+  "version": "0.1.0",
+  "description": "__PROJECT__ — widget de chat embarquable (Web Component vanilla)",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild __PKG__.js --bundle --minify --format=iife --outfile=dist/__PKG__.min.js",
+    "dev": "esbuild __PKG__.js --bundle --servedir=. --outfile=dist/__PKG__.min.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0"
+  }
+}

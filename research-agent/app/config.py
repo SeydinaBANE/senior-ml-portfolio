@@ -9,6 +9,10 @@ class Settings(BaseSettings):
 
     openai_api_key: str
     openai_model: str = "gpt-4o"
+    llm_api_base: str = ""
+    llm_api_key: str = ""
+    llm_model_primary: str = "gpt-4o"
+    llm_model_fallback: str = "gpt-4o-mini"
 
     tavily_api_key: str = ""
 
@@ -25,6 +29,9 @@ class Settings(BaseSettings):
     max_search_queries: int = 5
     max_sources_per_query: int = 3
     min_source_confidence: float = 0.6
+    rate_limit_max_requests: int = 100
+    rate_limit_window_sec: int = 60
+    api_key_mapping: dict[str, str] = {}
 
 
 settings = Settings()  # type: ignore[call-arg]

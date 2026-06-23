@@ -9,6 +9,10 @@ class Settings(BaseSettings):
 
     openai_api_key: str
     openai_model: str = "gpt-4o"
+    llm_api_base: str = ""
+    llm_api_key: str = ""
+    llm_model_primary: str = "gpt-4o"
+    llm_model_fallback: str = "gpt-4o-mini"
     embedding_model: str = "text-embedding-3-small"
 
     database_url: str
@@ -21,6 +25,9 @@ class Settings(BaseSettings):
     top_k_chunks: int = 6
     bm25_weight: float = 0.4
     vector_weight: float = 0.6
+    rate_limit_max_requests: int = 100
+    rate_limit_window_sec: int = 60
+    api_key_mapping: dict[str, str] = {}
 
 
 settings = Settings()  # type: ignore[call-arg]

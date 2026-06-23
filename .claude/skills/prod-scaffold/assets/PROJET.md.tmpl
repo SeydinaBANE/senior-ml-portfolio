@@ -1,0 +1,26 @@
+# __PROJECT__ — Vision & Architecture
+
+## Le probleme
+
+<!-- Quel besoin metier ce projet adresse-t-il ? -->
+
+## La proposition
+
+<!-- En une phrase, ce que fait __PROJECT__. -->
+
+## Architecture
+
+<!-- Flux d'une requete : entree -> orchestration -> sortie. -->
+
+## Modules (`src/__PKG__/`)
+
+- `config.py` — configuration pydantic-settings (`__PREFIX__`)
+- `logging.py` — logging structure structlog JSON
+- `gateway.py` — gateway LLM (primaire + fallback)
+- `api.py` — application FastAPI
+
+## Principes de conception
+
+- Typage strict, aucun service externe requis pour les tests unitaires
+- Gouvernance transverse (RBAC, PII, idempotence, audit)
+- Observabilite abstraite (executable hors-ligne)

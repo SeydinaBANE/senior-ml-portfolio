@@ -1,0 +1,37 @@
+.PHONY: help install lint format typecheck test build e2e docker-build docker-push deploy-widget
+
+help: ## Affiche cette aide
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
+	| awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-18s\033[0m %s\n", $$1, $$2}'
+
+install: ## Installe les deps de dev + hooks pre-commit
+	pip install -r lambda/requirements.txt -r lambda/requirements-dev.txt && \
+	pre-commit install
+
+lint: ## ruff check + format --check (line-length 100)
+	ruff check lambda/ tests/
+	ruff format --check lambda/ tests/
+
+format: ## Formate le code
+	ruff format lambda/ tests/
+
+typecheck: ## mypy strict
+	mypy lambda/
+
+test: ## pytest depuis la racine (conftest ajoute ../lambda au sys.path)
+	pytest tests/ -v --cov=lambda/ --cov-report=term-missing
+
+build: test lint typecheck ## Verifie tout avant PR
+
+e2e: ## Tests de charge Artillery (necessite docker compose up)
+	scripts/test-e2e.sh smoke
+
+docker-build: ## Construit l'image Lambda
+	docker build -t __PKG__:latest .
+
+docker-push: ## Pousse l'image vers GHCR
+	docker push ghcr.io/seydinabane/__PKG__:latest
+
+deploy-widget: ## Upload widget/dist vers S3 + invalidation CloudFront
+	aws s3 sync widget/dist/ s3://$(WIDGET_BUCKET)/ --delete
+	aws cloudfront create-invalidation --distribution-id $(CF_DIST_ID) --paths "/*"

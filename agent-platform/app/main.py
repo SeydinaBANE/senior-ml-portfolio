@@ -7,14 +7,22 @@ from prometheus_client import start_http_server
 from app.api.routes import agents, auth, billing, health, run
 from app.config import settings
 from app.db.session import engine
+from app.middleware import setup_middlewares
+from app.observability.logging import setup_logging
 from app.observability.tracing import setup_tracing
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    setup_logging()
     setup_tracing()
     if settings.app_env != "test":
         start_http_server(settings.metrics_port)
+    setup_middlewares(
+        app,
+        max_requests=settings.rate_limit_max_requests,
+        window_sec=settings.rate_limit_window_sec,
+    )
     yield
     await engine.dispose()
 

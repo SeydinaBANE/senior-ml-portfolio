@@ -1,0 +1,102 @@
+class __PROJECT__Chat extends HTMLElement {
+  static get observedAttributes() {
+    return ['tenant-id', 'api-url', 'primary-color', 'position', 'lang', 'token', 'stream'];
+  }
+
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' });
+    this._state = {
+      open: false,
+      messages: [],
+      loading: false,
+      tenantId: this.getAttribute('tenant-id') || 'default',
+      apiUrl: this.getAttribute('api-url') || 'https://api.__PKG__.dev',
+      primaryColor: this.getAttribute('primary-color') || '#6C5CE7',
+      position: this.getAttribute('position') || 'bottom-right',
+      lang: this.getAttribute('lang') || 'fr',
+      token: this.getAttribute('token') || null,
+      stream: this.getAttribute('stream') !== 'false',
+      pendingConfirmation: null,
+    };
+    this._render();
+    this._bindEvents();
+  }
+
+  attributeChangedCallback(name, _oldValue, newValue) {
+    const key = name.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+    this._state[key] = newValue;
+    this._render();
+    this._bindEvents();
+  }
+
+  _styles() {
+    return `
+      :host {
+        --primary: ${this._state.primaryColor};
+        --bg: #ffffff;
+        --text: #1a1a2e;
+        --border: #e5e7eb;
+        --radius: 16px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      .container {
+        position: fixed;
+        ${this._state.position === 'bottom-right' ? 'right: 20px;' : 'left: 20px;'}
+        bottom: 20px;
+        z-index: 2147483647;
+        direction: ${this._state.lang === 'ar' ? 'rtl' : 'ltr'};
+      }
+      .chat-button {
+        width: 60px; height: 60px; border-radius: 50%;
+        background: var(--primary); color: #fff; border: none;
+        cursor: pointer; font-size: 24px;
+        box-shadow: 0 4px 24px rgba(0,0,0,.12);
+      }
+      .panel { display: ${this._state.open ? 'flex' : 'none'}; }
+    `;
+  }
+
+  _render() {
+    this.shadowRoot.innerHTML = `
+      <style>${this._styles()}</style>
+      <div class="container">
+        <button class="chat-button" part="button" aria-label="chat">\u{1F4AC}</button>
+        <div class="panel" part="panel"></div>
+      </div>
+    `;
+  }
+
+  _bindEvents() {
+    const button = this.shadowRoot.querySelector('.chat-button');
+    if (button) button.addEventListener('click', () => this._toggle());
+  }
+
+  _toggle() {
+    this._state.open = !this._state.open;
+    this._render();
+    this._bindEvents();
+  }
+
+  async _send(message) {
+    this._state.loading = true;
+    try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (this._state.token) headers['Authorization'] = `Bearer ${this._state.token}`;
+      const res = await fetch(`${this._state.apiUrl}/chat`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ message, tenant_id: this._state.tenantId }),
+      });
+      const data = await res.json();
+      this._state.messages.push({ role: 'assistant', content: data.response || '' });
+    } finally {
+      this._state.loading = false;
+      this._render();
+      this._bindEvents();
+    }
+  }
+}
+
+customElements.define('__PKG__-chat', __PROJECT__Chat);

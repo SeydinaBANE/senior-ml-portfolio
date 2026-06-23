@@ -1,0 +1,74 @@
+"""Fixtures partagees : gateway scriptable, reset metriques, base SQLite optionnelle."""
+
+from __future__ import annotations
+
+from collections.abc import AsyncIterator, Iterator
+from typing import TYPE_CHECKING
+
+import pytest
+
+from __PKG__.gateway import LLMGateway
+from __PKG__.observability import METRICS
+from __PKG__.schemas import LLMRequest
+
+if TYPE_CHECKING:
+    from sqlalchemy import Engine
+
+
+class ScriptedProvider:
+    """Provider LLM qui renvoie une reponse predefinie (tests deterministes)."""
+
+    def __init__(self, model: str, reply: str) -> None:
+        self.model = model
+        self._reply = reply
+
+    async def complete(self, request: LLMRequest) -> str:
+        del request
+        return self._reply
+
+    async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
+        del request
+        for word in self._reply.split():
+            yield word
+
+
+def make_gateway(reply: str) -> LLMGateway:
+    """Construit un gateway dont le primaire renvoie toujours ``reply``."""
+    provider = ScriptedProvider(model="scripted", reply=reply)
+    return LLMGateway(primary=provider, fallback=provider)
+
+
+@pytest.fixture(autouse=True)
+def reset_metrics() -> Iterator[None]:
+    """Reinitialise les metriques entre chaque test."""
+    METRICS.reset()
+    yield
+    METRICS.reset()
+
+
+@pytest.fixture
+def business_engine() -> Engine:
+    """Engine SQLite en memoire seede (requiert ``sqlalchemy`` dans les deps de test)."""
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.pool import StaticPool
+
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "CREATE TABLE customers ("
+                "id INTEGER PRIMARY KEY, name TEXT, email TEXT, balance REAL)"
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO customers (id, name, email, balance) VALUES "
+                "(1, 'Acme', 'ops@acme.example', 1250.0), "
+                "(2, 'Globex', 'hi@globex.example', 0.0)"
+            )
+        )
+    return engine

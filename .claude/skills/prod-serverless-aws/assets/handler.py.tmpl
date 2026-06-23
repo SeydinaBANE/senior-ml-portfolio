@@ -1,0 +1,102 @@
+from __future__ import annotations
+
+import functools
+import json
+import os
+import time
+from typing import Any, TypedDict
+
+import boto3
+from auth import extract_user_context
+from aws_lambda_powertools import Logger
+from aws_lambda_powertools.utilities.typing import LambdaContext
+
+logger = Logger()
+
+METRICS_NAMESPACE = "__PROJECT__"
+MAX_TOOL_TURNS = 3
+TIMEOUT_GUARD_MS = 3000
+
+_json = functools.partial(json.dumps, ensure_ascii=False)
+
+_DEFAULT_PRIMARY = "anthropic.claude-3-5-sonnet-20240620-v1:0"
+_DEFAULT_FAST = "anthropic.claude-3-haiku-20240307-v1:0"
+MODEL_PRIMARY = os.environ.get("BEDROCK_MODEL_ID", _DEFAULT_PRIMARY)
+MODEL_FAST = os.environ.get("BEDROCK_FAST_MODEL_ID", _DEFAULT_FAST)
+
+MUTATING_TOOLS = frozenset({"ajouter_panier", "passer_commande"})
+
+
+class ConversationResult(TypedDict):
+    response: str
+    tool_calls_count: int
+
+
+def _bedrock_client() -> Any:
+    return boto3.client("bedrock-runtime")
+
+
+def _ssm_client() -> Any:
+    return boto3.client("ssm")
+
+
+def _cw_client() -> Any:
+    return boto3.client("cloudwatch")
+
+
+def _emit_metric(name: str, value: float, unit: str, dimensions: list[dict[str, str]]) -> None:
+    try:
+        _cw_client().put_metric_data(
+            Namespace=METRICS_NAMESPACE,
+            MetricData=[
+                {"MetricName": name, "Value": value, "Unit": unit, "Dimensions": dimensions}
+            ],
+        )
+    except Exception:
+        logger.exception("metric_emit_failed", metric_name=name)
+
+
+def _validate_tool_call(name: str, arguments: dict[str, Any]) -> None:
+    if name in MUTATING_TOOLS and not arguments.get("confirmed"):
+        raise ValueError(f"action '{name}' requiert confirmed=True")
+    base_url = arguments.get("base_url")
+    if base_url and not str(base_url).startswith("https://"):
+        raise ValueError("base_url non-HTTPS refusee")
+
+
+def _time_left_ms(context: LambdaContext) -> int:
+    return int(context.get_remaining_time_in_millis())
+
+
+def run_conversation(
+    message: str, user_context: dict[str, Any], context: LambdaContext
+) -> ConversationResult:
+    logger.debug("conversation_start", chars=len(message), tenant=user_context.get("tenant_id"))
+    turns = 0
+    while turns < MAX_TOOL_TURNS:
+        if _time_left_ms(context) < TIMEOUT_GUARD_MS:
+            logger.warning("timeout_guard_hit", turns=turns)
+            break
+        turns += 1
+    return {"response": "", "tool_calls_count": turns}
+
+
+@logger.inject_lambda_context
+def handler(event: dict[str, Any], context: LambdaContext) -> dict[str, Any]:
+    body = json.loads(event.get("body") or "{}")
+    message = str(body.get("message", ""))[:2000]
+    token = (event.get("headers") or {}).get("authorization")
+    jwks_uri = os.environ.get("JWKS_URI")
+    user_context = extract_user_context(token, jwks_uri)
+
+    start = time.perf_counter()
+    result = run_conversation(message, user_context, context)
+    elapsed_ms = (time.perf_counter() - start) * 1000
+    dimensions = [{"Name": "Tenant", "Value": user_context["tenant_id"]}]
+    _emit_metric("Latency", elapsed_ms, "Milliseconds", dimensions)
+
+    return {
+        "statusCode": 200,
+        "headers": {"Content-Type": "application/json; charset=utf-8"},
+        "body": _json(result),
+    }

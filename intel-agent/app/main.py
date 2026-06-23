@@ -5,6 +5,7 @@ from fastapi import FastAPI
 
 from app.api.routes import health, intelligence, summarize
 from app.config import settings
+from app.middleware import setup_middlewares
 from app.observability.logging import setup_logging
 from app.observability.metrics import start_metrics_server
 from app.observability.tracing import setup_tracing
@@ -15,6 +16,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     setup_logging()
     start_metrics_server()
     setup_tracing(fastapi_app=app)
+    setup_middlewares(
+        app,
+        max_requests=settings.rate_limit_max_requests,
+        window_sec=settings.rate_limit_window_sec,
+    )
     yield
 
 
