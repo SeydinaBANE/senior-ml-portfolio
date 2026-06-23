@@ -1,0 +1,169 @@
+"""Exemple de tests : 1 cas nominal + 1 cas d'erreur par comportement.
+
+Sert aussi de demonstration des conventions du harnais : async sans decorateur
+(asyncio_mode=auto), provider scripte, injection httpx.MockTransport (zero reseau),
+fallback de gateway, RBAC et masquage PII. A dupliquer puis nettoyer.
+"""
+
+from __future__ import annotations
+
+import httpx
+import pytest
+
+from __PKG__.config import get_settings
+from __PKG__.gateway import (
+    FailingProvider,
+    HttpLLMProvider,
+    LLMGateway,
+    LLMProviderError,
+    LocalProvider,
+    build_default_gateway,
+)
+from __PKG__.governance import (
+    AccessDeniedError,
+    AuditLog,
+    IdempotencyGuard,
+    Permission,
+    Principal,
+    RBACPolicy,
+    mask_pii,
+)
+from __PKG__.logging import configure_logging, get_logger
+from __PKG__.observability import METRICS, record_span
+from __PKG__.schemas import LLMRequest, Message, Role
+
+from .conftest import make_gateway
+
+
+def _request(text: str) -> LLMRequest:
+    return LLMRequest(messages=[Message(role=Role.USER, content=text)])
+
+
+async def test_gateway_returns_primary_reply() -> None:
+    gateway = make_gateway("bonjour")
+    response = await gateway.complete(_request("salut"))
+    assert response.content == "bonjour"
+    assert response.used_fallback is False
+
+
+async def test_gateway_falls_back_on_primary_failure() -> None:
+    gateway = LLMGateway(
+        primary=FailingProvider(model="primary"),
+        fallback=LocalProvider(model="fallback"),
+    )
+    response = await gateway.complete(_request("ping"))
+    assert response.content == "ping"
+    assert response.used_fallback is True
+
+
+async def test_gateway_streams_tokens() -> None:
+    gateway = make_gateway("un deux trois")
+    tokens = [token async for token in gateway.stream(_request("x"))]
+    assert tokens == ["un", "deux", "trois"]
+
+
+async def test_gateway_stream_falls_back() -> None:
+    gateway = LLMGateway(
+        primary=FailingProvider(model="primary"),
+        fallback=LocalProvider(model="fallback"),
+    )
+    tokens = [token async for token in gateway.stream(_request("hello world"))]
+    assert tokens == ["hello", "world"]
+
+
+async def test_http_provider_returns_content() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://llm")
+    provider = HttpLLMProvider(model="m", client=client)
+    assert await provider.complete(_request("hi")) == "ok"
+    await client.aclose()
+
+
+async def test_http_provider_raises_on_http_error() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://llm")
+    provider = HttpLLMProvider(model="m", client=client)
+    with pytest.raises(LLMProviderError):
+        await provider.complete(_request("hi"))
+    await client.aclose()
+
+
+async def test_http_provider_streams_sse() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        body = (
+            'data: {"choices":[{"delta":{"content":"a"}}]}\n\n'
+            'data: {"choices":[{"delta":{"content":"b"}}]}\n\n'
+            "data: [DONE]\n\n"
+        )
+        return httpx.Response(200, text=body)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://llm")
+    provider = HttpLLMProvider(model="m", client=client)
+    tokens = [token async for token in provider.stream(_request("hi"))]
+    assert tokens == ["a", "b"]
+    await client.aclose()
+
+
+def test_build_default_gateway_uses_local_offline() -> None:
+    get_settings.cache_clear()
+    gateway = build_default_gateway()
+    assert isinstance(gateway, LLMGateway)
+
+
+def test_settings_api_key_mapping() -> None:
+    get_settings.cache_clear()
+    settings = get_settings()
+    assert settings.api_key_mapping["dev-key-viewer"] == "viewer"
+    assert settings.api_key_mapping["dev-key-operator"] == "operator"
+
+
+def test_logging_configures_and_returns_logger() -> None:
+    configure_logging()
+    logger = get_logger("test")
+    logger.info("hello")
+
+
+def test_rbac_allows_operator_write() -> None:
+    policy = RBACPolicy()
+    operator = Principal(user_id="u1", roles=frozenset({"operator"}))
+    policy.authorize(operator, Permission.WRITE)
+
+
+def test_rbac_denies_viewer_write() -> None:
+    policy = RBACPolicy()
+    viewer = Principal(user_id="u2", roles=frozenset({"viewer"}))
+    with pytest.raises(AccessDeniedError):
+        policy.authorize(viewer, Permission.WRITE)
+
+
+def test_mask_pii_redacts_email_and_phone() -> None:
+    masked = mask_pii("contact ops@acme.example au 06 12 34 56 78")
+    assert "ops@acme.example" not in masked
+    assert "[email]" in masked
+    assert "[phone]" in masked
+
+
+def test_idempotency_guard_blocks_replay() -> None:
+    guard = IdempotencyGuard()
+    assert guard.is_new("k1") is True
+    assert guard.is_new("k1") is False
+
+
+def test_audit_log_records_entry() -> None:
+    audit = AuditLog()
+    principal = Principal(user_id="u1", roles=frozenset({"operator"}))
+    audit.record(principal, action="write", resource="orders", allowed=True)
+    assert len(audit.entries) == 1
+    assert audit.entries[0].allowed is True
+
+
+def test_record_span_collects_duration() -> None:
+    METRICS.reset()
+    with record_span("op", kind="test"):
+        pass
+    assert METRICS.spans[-1].name == "op"
+    assert METRICS.spans[-1].duration_ms >= 0

@@ -1,0 +1,38 @@
+# __PROJECT__ — agent instructions
+
+Python 3.12+ FastAPI GenAI service.
+
+## Setup & commands
+
+```bash
+make init        # .venv + pip install -e ".[dev,test]" + pre-commit hooks
+cp .env.example .env
+make docker-up   # stack locale complete
+```
+
+Order before push: `make build` (= lint + typecheck + test). CI runs the same plus
+`ruff format --check` and `pytest --cov-fail-under=80`.
+
+| Command | What |
+|---|---|
+| `make lint` | `ruff check src/ tests/` |
+| `make format` | `ruff format src/ tests/` |
+| `make typecheck` | `mypy src/` (strict + pydantic plugin) |
+| `make test` | `pytest tests/` (asyncio_mode=auto, auto-coverage) |
+| `make security` | `detect-secrets scan` + `pip-audit` |
+
+Run a single test: `pytest tests/test_xxx.py -k test_case`.
+
+## Architecture
+
+- Package `__PKG__` under `src/` (imports are `from __PKG__.xxx import ...`)
+- **Entrypoint:** `__PKG__.api:app` (FastAPI)
+- **Config:** pydantic-settings, `__PREFIX__` prefix, loaded from `.env` — see `src/__PKG__/config.py`
+
+## Style
+
+- Ruff line-length 100, target py312, no `Any`/`dict`/`list` without concrete types
+- Python 3.12 syntax (`Annotated`, `frozenset`, `StrEnum`, `Protocol`)
+- structlog JSON logging (use `get_logger(__name__)`), no `print`
+- No comments in code — code must be self-documenting
+- `pre-commit` hooks run on every commit: ruff lint/format, mypy, detect-secrets
