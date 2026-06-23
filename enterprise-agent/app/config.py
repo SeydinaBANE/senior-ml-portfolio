@@ -30,6 +30,9 @@ class Settings(BaseSettings):
 
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60
+    rate_limit_max_requests: int = 100
+    rate_limit_window_sec: int = 60
+    api_key_mapping: dict[str, str] = {}
 
     @model_validator(mode="after")
     def validate_production_config(self) -> "Settings":
