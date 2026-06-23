@@ -1,5 +1,5 @@
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 from fastapi import FastAPI
 
@@ -7,11 +7,17 @@ from app.api.routes import health, ingest, query
 from app.config import settings
 from app.db.session import engine
 from app.middleware import setup_middlewares
+from app.observability.logging import setup_logging
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    setup_middlewares(app, max_requests=settings.rate_limit_max_requests, window_sec=settings.rate_limit_window_sec)
+    setup_logging()
+    setup_middlewares(
+        app,
+        max_requests=settings.rate_limit_max_requests,
+        window_sec=settings.rate_limit_window_sec,
+    )
     yield
     await engine.dispose()
 
