@@ -13,14 +13,14 @@ class Settings(BaseSettings):
 
     openai_api_key: str = "sk-test"
     openai_model: str = "gpt-4o"
+    llm_api_base: str = ""
+    llm_api_key: str = ""
+    llm_model_primary: str = "gpt-4o"
+    llm_model_fallback: str = "gpt-4o-mini"
     embedding_model: str = "text-embedding-3-small"
 
-    database_url: str = (
-        "postgresql+asyncpg://postgres:postgres@localhost:5432/enterprise_agent"
-    )
-    database_url_sync: str = (
-        "postgresql://postgres:postgres@localhost:5432/enterprise_agent"
-    )
+    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/enterprise_agent"
+    database_url_sync: str = "postgresql://postgres:postgres@localhost:5432/enterprise_agent"
 
     redis_url: str = "redis://localhost:6379/0"
 

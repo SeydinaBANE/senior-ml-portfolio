@@ -9,6 +9,10 @@ class Settings(BaseSettings):
 
     openai_api_key: str
     openai_model: str = "gpt-4o"
+    llm_api_base: str = ""
+    llm_api_key: str = ""
+    llm_model_primary: str = "gpt-4o"
+    llm_model_fallback: str = "gpt-4o-mini"
     embedding_model: str = "text-embedding-3-small"
 
     database_url: str
