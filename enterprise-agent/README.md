@@ -201,3 +201,14 @@ scripts/
 **Multi-tenant vector search** — `pgvector` doesn't support per-tenant HNSW indexes natively. Solution: add `WHERE tenant_id = :tenant_id` before the `ORDER BY embedding <=>` clause so Postgres filters rows before distance sorting. Acceptable performance up to ~500k documents per tenant.
 
 **Prompt injection at the perimeter** — Regex patterns are fast but incomplete. The guardrail layer uses a blocklist of known injection patterns (case-insensitive) as a first pass. For production, this should be combined with an LLM-as-judge or fine-tuned classifier.
+
+## Cross-cutting foundations
+
+Shared production foundations wired into every layer of this project:
+
+- **Structured logging** — `app/observability/logging.py`: `setup_logging()` (structlog → JSON) and `get_logger()`, with `request_id` propagated via contextvars. Initialised in the FastAPI lifespan.
+- **Observability** — `app/observability/__init__.py`: in-memory `METRICS` counters and `record_span()` timing, offline-friendly and swappable for Prometheus/Langfuse without changing call sites.
+- **Governance** — `app/governance.py`: `RBACPolicy.authorize` (role→permission, raises `AccessDeniedError`), `mask_pii`, `IdempotencyGuard`, and an append-only `AuditLog`.
+- **LLM gateway** — `app/gateway.py` + `app/schemas/llm.py`: provider-agnostic `LLMGateway` with a deterministic offline `LocalProvider`, an OpenAI/LiteLLM-compatible `HttpLLMProvider`, automatic primary→fallback and streaming.
+
+Known technical debt is tracked in [`DETTE-TECHNIQUE.md`](./DETTE-TECHNIQUE.md).

@@ -68,3 +68,14 @@ Google OAuth2 token is auto-refreshed but initial auth must be done externally (
 | `test_tools/test_verifier.py` | 2 | Supports claim, fetch failure returns unverified |
 
 No API endpoint tests. No Gmail/Calendar/Notion/Slack tool tests.
+
+## Cross-cutting foundations
+
+Shared production foundations wired into every layer of this project:
+
+- **Structured logging** — `app/observability/logging.py`: `setup_logging()` (structlog → JSON) and `get_logger()`, with `request_id` propagated via contextvars. Initialised in the FastAPI lifespan.
+- **Observability** — `app/observability/__init__.py`: in-memory `METRICS` counters and `record_span()` timing, offline-friendly and swappable for Prometheus/Langfuse without changing call sites.
+- **Governance** — `app/governance.py`: `RBACPolicy.authorize` (role→permission, raises `AccessDeniedError`), `mask_pii`, `IdempotencyGuard`, and an append-only `AuditLog`.
+- **LLM gateway** — `app/gateway.py` + `app/schemas/llm.py`: provider-agnostic `LLMGateway` with a deterministic offline `LocalProvider`, an OpenAI/LiteLLM-compatible `HttpLLMProvider`, automatic primary→fallback and streaming.
+
+Known technical debt is tracked in [`DETTE-TECHNIQUE.md`](./DETTE-TECHNIQUE.md).

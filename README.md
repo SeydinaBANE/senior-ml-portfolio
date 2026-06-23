@@ -243,13 +243,26 @@ All six projects follow the same layered structure and toolchain:
 
 ```
 app/
-  main.py          FastAPI app + lifespan (tracing init, DB teardown)
+  main.py          FastAPI app + lifespan (logging + tracing init, DB teardown)
   config.py        pydantic-settings — all config from env, zero hardcoding
   api/             routers + deps.py (dependency injection)
-  schemas/         Pydantic v2 I/O models (strict types, no Any)
+  schemas/         Pydantic v2 I/O models (strict types, no Any) — incl. llm.py
   db/              SQLAlchemy async models + session factory
-  observability/   OTel tracing, Prometheus metrics, structlog JSON logging
+  observability/   structlog JSON logging, in-memory METRICS + record_span, OTel tracing, Prometheus
+  governance.py    RBAC, PII masking, idempotency guard, append-only audit log
+  gateway.py       provider-agnostic LLM gateway (primary→fallback, offline LocalProvider)
 ```
+
+**Cross-cutting foundations** (shared by all six projects)
+
+| Module | Provides |
+|--------|----------|
+| `observability/logging.py` | `setup_logging()` + `get_logger()` — structured JSON logs (structlog), `request_id` propagated via contextvars |
+| `observability/__init__.py` | `METRICS` (in-memory counters) + `record_span()` (timed block + JSON span) — offline-friendly, swappable for Prometheus/Langfuse without API change |
+| `governance.py` | `RBACPolicy.authorize` (role→permission, raises `AccessDeniedError`), `mask_pii`, `IdempotencyGuard`, append-only `AuditLog` |
+| `gateway.py` + `schemas/llm.py` | `LLMGateway` over an `LLMProvider` protocol: deterministic offline `LocalProvider`, `HttpLLMProvider` (OpenAI/LiteLLM), automatic primary→fallback + streaming |
+
+The gateway and governance layers are instrumented through `METRICS`/`record_span`, so latency and success/failure counters work offline and in tests. Each project also ships a prioritized **`DETTE-TECHNIQUE.md`** register documenting known debt (P1→P3) and its remediation.
 
 **Toolchain**
 
