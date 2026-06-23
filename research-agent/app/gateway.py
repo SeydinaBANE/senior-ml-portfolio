@@ -14,6 +14,7 @@ import httpx
 
 from app.config import Settings
 from app.config import settings as app_settings
+from app.observability import METRICS, record_span
 from app.observability.logging import get_logger
 from app.schemas.llm import LLMRequest, LLMResponse
 
@@ -136,28 +137,38 @@ class LLMGateway:
 
     async def complete(self, request: LLMRequest) -> LLMResponse:
         """Appelle le primaire puis le fallback ; leve ``LLMProviderError`` si les deux echouent."""
-        try:
-            content = await self._primary.complete(request)
-            return LLMResponse(content=content, model=self._primary.model)
-        except LLMProviderError as exc:
-            logger.warning("primary_failed", model=self._primary.model, error=str(exc))
+        with record_span("llm.primary", model=self._primary.model):
+            try:
+                content = await self._primary.complete(request)
+                METRICS.incr("llm.primary.success")
+                return LLMResponse(content=content, model=self._primary.model)
+            except LLMProviderError as exc:
+                METRICS.incr("llm.primary.failure")
+                logger.warning("primary_failed", model=self._primary.model, error=str(exc))
 
-        content = await self._fallback.complete(request)
-        return LLMResponse(content=content, model=self._fallback.model, used_fallback=True)
+        with record_span("llm.fallback", model=self._fallback.model):
+            content = await self._fallback.complete(request)
+            METRICS.incr("llm.fallback.success")
+            return LLMResponse(content=content, model=self._fallback.model, used_fallback=True)
 
     async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
         """Diffuse la completion depuis le primaire, avec fallback sur le secondaire."""
         tried_primary = False
         try:
-            async for token in self._primary.stream(request):
-                tried_primary = True
-                yield token
-            return
+            with record_span("llm.primary", model=self._primary.model):
+                async for token in self._primary.stream(request):
+                    tried_primary = True
+                    yield token
+                METRICS.incr("llm.primary.success")
+                return
         except LLMProviderError as exc:
+            METRICS.incr("llm.primary.failure")
             logger.warning("primary_failed", model=self._primary.model, error=str(exc))
             if not tried_primary:
-                async for token in self._fallback.stream(request):
-                    yield token
+                with record_span("llm.fallback", model=self._fallback.model):
+                    async for token in self._fallback.stream(request):
+                        yield token
+                    METRICS.incr("llm.fallback.success")
 
 
 def _build_async_http_client(cfg: Settings) -> httpx.AsyncClient:

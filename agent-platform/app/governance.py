@@ -12,6 +12,7 @@ import time
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+from app.observability import METRICS
 from app.observability.logging import get_logger
 
 logger = get_logger(__name__)
@@ -63,6 +64,7 @@ class RBACPolicy:
     def authorize(self, principal: Principal, permission: Permission) -> None:
         """Leve ``AccessDeniedError`` si le principal ne possede pas la permission."""
         if permission not in self.permissions_of(principal):
+            METRICS.incr("governance.access_denied")
             raise AccessDeniedError(f"{principal.user_id} non autorise pour {permission}")
 
 
