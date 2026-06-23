@@ -19,5 +19,9 @@ class Settings(BaseSettings):
 
     metrics_port: int = 9090
 
+    rate_limit_max_requests: int = 100
+    rate_limit_window_sec: int = 60
+    api_key_mapping: dict[str, str] = {}
+
 
 settings = Settings()  # type: ignore[call-arg]
