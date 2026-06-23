@@ -6,9 +6,7 @@ from sqlalchemy import text
 from app.config import settings
 from app.db.session import async_session
 
-_embeddings = OpenAIEmbeddings(
-    model=settings.embedding_model, api_key=settings.openai_api_key
-)
+_embeddings = OpenAIEmbeddings(model=settings.embedding_model, api_key=settings.openai_api_key)
 
 
 @dataclass
@@ -16,7 +14,7 @@ class ScoredChunk:
     content: str
     score: float
     source: str
-    metadata: dict
+    metadata: dict[str, object]
 
 
 async def vector_search(query: str, top_k: int) -> list[ScoredChunk]:

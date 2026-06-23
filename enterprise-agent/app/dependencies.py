@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import Header, HTTPException
 
 from app.config import settings
-from app.governance import Principal, audit_log, rbac_policy
+from app.governance import AuditLog, Principal, RBACPolicy, audit_log, rbac_policy
 
 
 def get_principal(

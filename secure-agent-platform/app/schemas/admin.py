@@ -22,7 +22,7 @@ class AgentCreate(BaseModel):
     id: str = Field(..., min_length=1, max_length=255, pattern=r"^[a-z0-9_-]+$")
     name: str = Field(..., min_length=1, max_length=255)
     description: str = ""
-    config: dict = Field(default_factory=dict)
+    config: dict[str, object] = Field(default_factory=dict)
 
 
 class AgentResponse(BaseModel):

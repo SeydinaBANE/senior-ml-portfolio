@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from app.core.audit.models import AuditEventType
@@ -11,7 +11,7 @@ async def log_event(
     user_id: str,
     agent_id: str,
     event_type: AuditEventType,
-    payload: dict,
+    payload: dict[str, object],
     verdict: str | None = None,
 ) -> None:
     async with async_session() as db:
@@ -23,7 +23,7 @@ async def log_event(
                 event_type=event_type.value,
                 payload=payload,
                 verdict=verdict,
-                occurred_at=datetime.now(timezone.utc),
+                occurred_at=datetime.now(UTC),
             )
         )
         await db.commit()

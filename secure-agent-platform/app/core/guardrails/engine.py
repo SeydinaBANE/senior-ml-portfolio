@@ -1,22 +1,11 @@
-from dataclasses import dataclass
-from enum import StrEnum
-
 from app.core.guardrails.injection import detect_injection
 from app.core.guardrails.llamaguard import LlamaGuardClient
+from app.core.guardrails.types import GuardrailResult, GuardrailVerdict
 from app.observability.metrics import guardrail_violations_total
 
+__all__ = ["GuardrailResult", "GuardrailVerdict", "check_input", "check_output"]
+
 _llamaguard = LlamaGuardClient()
-
-
-class GuardrailVerdict(StrEnum):
-    SAFE = "safe"
-    UNSAFE = "unsafe"
-
-
-@dataclass
-class GuardrailResult:
-    verdict: GuardrailVerdict
-    category: str | None = None
 
 
 async def check_input(text: str, tenant_id: str) -> GuardrailResult:

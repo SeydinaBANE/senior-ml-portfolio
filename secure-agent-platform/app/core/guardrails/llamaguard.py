@@ -3,12 +3,13 @@ from typing import Literal
 from langchain_openai import ChatOpenAI
 
 from app.config import settings
-from app.core.guardrails.engine import GuardrailResult, GuardrailVerdict
+from app.core.guardrails.types import GuardrailResult, GuardrailVerdict
 
 _SYSTEM_PROMPT = (
     "You are a content safety classifier. "
     "Classify the following message as SAFE or UNSAFE. "
-    "If unsafe, identify the category from: violence, hate, sexual, self-harm, illegal, prompt_injection. "
+    "If unsafe, identify the category from: "
+    "violence, hate, sexual, self-harm, illegal, prompt_injection. "
     'Respond in JSON: {"verdict": "safe"|"unsafe", "category": null|"string"}'
 )
 
@@ -21,9 +22,7 @@ class LlamaGuardClient:
             temperature=0,
         )
 
-    async def classify(
-        self, text: str, role: Literal["user", "assistant"]
-    ) -> GuardrailResult:
+    async def classify(self, text: str, role: Literal["user", "assistant"]) -> GuardrailResult:
         from langchain_core.messages import HumanMessage, SystemMessage
         from pydantic import BaseModel
 

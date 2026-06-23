@@ -1,9 +1,5 @@
 from dataclasses import dataclass
 
-from datasets import Dataset
-from ragas import evaluate
-from ragas.metrics import answer_relevancy, context_precision, faithfulness
-
 from app.db.models import EvaluationResult
 from app.db.session import async_session
 
@@ -24,6 +20,10 @@ class EvalScores:
 
 
 def run_ragas(samples: list[EvalSample]) -> list[EvalScores]:
+    from datasets import Dataset
+    from ragas import evaluate
+    from ragas.metrics import answer_relevancy, context_precision, faithfulness
+
     dataset = Dataset.from_list(
         [
             {

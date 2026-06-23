@@ -2,7 +2,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.tools.search import SearchResult, web_search
+from app.tools import search
+from app.tools.search import web_search
 
 
 @pytest.mark.asyncio
@@ -16,7 +17,7 @@ async def test_web_search_filters_by_confidence() -> None:
     mock_client = MagicMock()
     mock_client.search.return_value = mock_response
 
-    with patch("app.tools.search._client", mock_client):
+    with patch("app.tools.search._get_client", return_value=mock_client):
         results = await web_search("test query", max_results=5)
 
     assert all(r.score >= 0.6 for r in results)
@@ -26,6 +27,8 @@ async def test_web_search_filters_by_confidence() -> None:
 
 @pytest.mark.asyncio
 async def test_web_search_raises_without_api_key() -> None:
-    with patch("app.tools.search._client", None):
+    search._get_client.cache_clear()
+    with patch.object(search.settings, "tavily_api_key", ""):
         with pytest.raises(RuntimeError, match="TAVILY_API_KEY"):
             await web_search("test")
+    search._get_client.cache_clear()
