@@ -1,11 +1,24 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
+from functools import lru_cache
+from typing import TYPE_CHECKING
 
 from langchain_core.tools import tool
-from tavily import TavilyClient
 
 from app.config import settings
 
-_client = TavilyClient(api_key=settings.tavily_api_key) if settings.tavily_api_key else None
+if TYPE_CHECKING:
+    from tavily import TavilyClient
+
+
+@lru_cache(maxsize=1)
+def _get_client() -> TavilyClient:
+    if not settings.tavily_api_key:
+        raise RuntimeError("TAVILY_API_KEY not configured")
+    from tavily import TavilyClient
+
+    return TavilyClient(api_key=settings.tavily_api_key)
 
 
 @dataclass
@@ -17,12 +30,11 @@ class SearchResult:
 
 
 async def web_search(query: str, max_results: int | None = None) -> list[SearchResult]:
-    if _client is None:
-        raise RuntimeError("TAVILY_API_KEY not configured")
-
+    client = _get_client()
     k = max_results or settings.max_sources_per_query
-    response = _client.search(query=query, max_results=k, include_raw_content=False)
+    response = client.search(query=query, max_results=k, include_raw_content=False)
 
+    threshold = settings.min_source_confidence
     return [
         SearchResult(
             url=r.get("url", ""),
@@ -31,6 +43,7 @@ async def web_search(query: str, max_results: int | None = None) -> list[SearchR
             score=float(r.get("score", 0.0)),
         )
         for r in response.get("results", [])
+        if float(r.get("score", 0.0)) >= threshold
     ]
 
 

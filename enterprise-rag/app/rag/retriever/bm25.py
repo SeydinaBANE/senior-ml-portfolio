@@ -1,5 +1,3 @@
-from dataclasses import dataclass
-
 from rank_bm25 import BM25Okapi
 from sqlalchemy import select
 
@@ -14,7 +12,7 @@ def _tokenize(text: str) -> list[str]:
 
 async def bm25_search(query: str, top_k: int) -> list[ScoredChunk]:
     async with async_session() as db:
-        result = await db.execute(select(Document.content, Document.source, Document.metadata))
+        result = await db.execute(select(Document.content, Document.source, Document.meta))
         rows = result.fetchall()
 
     if not rows:
@@ -24,9 +22,7 @@ async def bm25_search(query: str, top_k: int) -> list[ScoredChunk]:
     bm25 = BM25Okapi(corpus)
     scores = bm25.get_scores(_tokenize(query))
 
-    indexed = sorted(
-        zip(scores, rows), key=lambda x: x[0], reverse=True
-    )[:top_k]
+    indexed = sorted(zip(scores, rows, strict=False), key=lambda x: x[0], reverse=True)[:top_k]
 
     return [
         ScoredChunk(content=row[0], score=float(score), source=row[1], metadata=row[2])

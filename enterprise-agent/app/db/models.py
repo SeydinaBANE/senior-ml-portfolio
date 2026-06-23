@@ -25,8 +25,8 @@ class Document(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     tenant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tenants.id"), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    metadata: Mapped[dict] = mapped_column(JSON, default=dict)
-    embedding: Mapped[list] = mapped_column(Vector(1536))
+    meta: Mapped[dict[str, object]] = mapped_column("metadata", JSON, default=dict)
+    embedding: Mapped[list[float]] = mapped_column(Vector(1536))
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 

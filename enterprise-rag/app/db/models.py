@@ -18,8 +18,8 @@ class Document(Base):
     source: Mapped[str] = mapped_column(String(50), nullable=False)
     source_id: Mapped[str] = mapped_column(String(512), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    metadata: Mapped[dict] = mapped_column(JSON, default=dict)
-    embedding: Mapped[list] = mapped_column(Vector(1536))
+    meta: Mapped[dict[str, object]] = mapped_column("metadata", JSON, default=dict)
+    embedding: Mapped[list[float]] = mapped_column(Vector(1536))
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
@@ -29,7 +29,7 @@ class EvaluationResult(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     question: Mapped[str] = mapped_column(Text, nullable=False)
     answer: Mapped[str] = mapped_column(Text, nullable=False)
-    contexts: Mapped[list] = mapped_column(JSON, default=list)
+    contexts: Mapped[list[str]] = mapped_column(JSON, default=list)
     faithfulness: Mapped[float | None] = mapped_column(nullable=True)
     answer_relevancy: Mapped[float | None] = mapped_column(nullable=True)
     context_precision: Mapped[float | None] = mapped_column(nullable=True)
